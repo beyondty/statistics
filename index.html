@@ -42,7 +42,7 @@
         </div>
 
         <div class="mt-4">
-            <button id="generate-table" class="bg-green-500 text-white p-2 rounded w-full">Generate Table</button>
+            <button id="generate-table" class="bg-black text-white p-2 rounded w-full">Generate Table</button>
         </div>
 
         <div id="data-table-container" class="mt-4">
@@ -70,19 +70,22 @@
                     <input type="checkbox" name="measure" value="mode" class="mr-2">Mode
                 </label>
                 <label class="flex items-center">
-                    <input type="checkbox" name="measure" value="quartile" class="mr-2">Quartile (Ungrouped data)
+                    <input type="checkbox" name="measure" value="quartile" class="mr-2">Quartile
                 </label>
                 <label class="flex items-center">
-                    <input type="checkbox" name="measure" value="decile" class="mr-2">Decile (Ungrouped data)
+                    <input type="checkbox" name="measure" value="decile" class="mr-2">Decile
                 </label>
                 <label class="flex items-center">
-                    <input type="checkbox" name="measure" value="percentile" class="mr-2">Percentile (Ungrouped data)
+                    <input type="checkbox" name="measure" value="percentile" class="mr-2">Percentile
                 </label>
                 <label class="flex items-center">
                     <input type="checkbox" name="measure" value="standard-deviation" class="mr-2">Standard Deviation
                 </label>
                 <label class="flex items-center">
                     <input type="checkbox" name="measure" value="variance" class="mr-2">Variance
+                </label>
+                <label class="flex items-center">
+                    <input type="checkbox" name="measure" value="mean-deviation" class="mr-2">Mean Deviation
                 </label>
             </div>
             <input type="number" id="specific-measure-input" placeholder="Enter x for Quartile/Decile/Percentile" class="w-full p-2 border rounded mt-2">
@@ -242,12 +245,14 @@
 
         function computeStatistics(data, tableType, measures, specificMeasure) {
             const results = { calculations: {} };
-            const totalFrequency = data.reduce((sum, row) => sum + row.frequency, 0);
 
             measures.forEach(measure => {
                 switch(measure) {
                     case 'mean':
                         results.calculations.mean = calculateMean(data, tableType);
+                        break;
+                    case 'meanr':
+                        results.meanr = calculateMeanR(data, tableType);
                         break;
                     case 'median':
                         results.calculations.median = calculateMedian(data, tableType);
@@ -256,20 +261,24 @@
                         results.calculations.mode = calculateMode(data, tableType);
                         break;
                     case 'quartile':
-                        results.calculations.quartile = calculateQuartile(data, totalFrequency, specificMeasure);
+                        results.calculations.quartile = calculateQuartile(data, tableType, specificMeasure);
                         break;
                     case 'decile':
-                        results.calculations.decile = calculateDecile(data, totalFrequency, specificMeasure);
+                        results.calculations.decile = calculateDecile(data, tableType, specificMeasure);
                         break;
                     case 'percentile':
-                        results.calculations.percentile = calculatePercentile(data, totalFrequency, specificMeasure);
+                        results.calculations.percentile = calculatePercentile(data, tableType, specificMeasure);
                         break;
                     case 'standard-deviation':
-                        results.standardDeviation = calculateStandardDeviation(data, tableType);
+                        results.calculations.standardDeviation = calculateStandardDeviation(data, tableType);
                         break;
                     case 'variance':
-                        results.variance = calculateVariance(data, tableType);
+                        results.calculations.variance = calculateVariance(data, tableType);
                         break;
+                    case 'mean-deviation':
+                        results.calculations.meanDeviation = calculateMeanDeviation(data, tableType);
+                        break;
+
                 }
             });
 
@@ -292,7 +301,6 @@
                 calculation.steps.push(`Total Frequency: ${totalFrequency}`);
                 calculation.result = totalProduct / totalFrequency;
                 calculation.steps.push(`Mean: ${totalProduct} / ${totalFrequency} = ${calculation.result}`);
-                return totalProduct / totalFrequency;
             } else {
                 const totalProduct = data.reduce((sum, row) => {
                     const [min, max] = row.x.split('-').map(Number);
@@ -309,33 +317,42 @@
                 calculation.steps.push(`Total Frequency: ${totalFrequency}`);
                 calculation.result = totalProduct / totalFrequency;
                 calculation.steps.push(`Mean: ${totalProduct} / ${totalFrequency} = ${calculation.result}`);
-                return totalProduct / totalFrequency;
             }
 
             return calculation;
+        }
+
+        function calculateMeanR(data, tableType) {
+            // Implement mean calculation based on table type
+            if (tableType === 'x-frequency') {
+                const totalProduct = data.reduce((sum, row) => sum + row.x * row.frequency, 0);
+                const totalFrequency = data.reduce((sum, row) => sum + row.frequency, 0);
+                return totalProduct / totalFrequency;
+            } else {
+                // For class frequency, calculate midpoint
+                const totalProduct = data.reduce((sum, row) => {
+                    const [min, max] = row.x.split('-').map(Number);
+                    const midpoint = (min + max) / 2;
+                    return sum + midpoint * row.frequency;
+                }, 0);
+                const totalFrequency = data.reduce((sum, row) => sum + row.frequency, 0);
+                return totalProduct / totalFrequency;
+            }
         }
 
         // Similar detailed calculation modifications for other statistical methods
         function calculateMedian(data, tableType) {
             let calculation = { steps: [] };
             const totalFrequency = data.reduce((sum, row) => sum + row.frequency, 0);
-            const medianPosition = Math.ceil(totalFrequency / 2);
+            const medianPosition = totalFrequency / 2;
             
             calculation.steps.push(`Total Frequency: ${totalFrequency}`);
             calculation.steps.push(`Median Position: ${medianPosition}`);
 
             if (tableType === 'x-frequency') {
                 // Same as before for X & Frequency
-                let cumulativeFrequency = 0;
-                for (let row of data) {
-                    cumulativeFrequency += row.frequency;
-                    calculation.steps.push(`Cumulative Frequency: ${cumulativeFrequency}`);
-                    if (cumulativeFrequency >= medianPosition) {
-                        calculation.result = row.x;
-                        calculation.steps.push(`Median: ${row.x}`);
-                        break;
-                    }
-                }
+                calculation.result = totalFrequency/2;
+                calculation.steps.push(`Median: ${calculation.result}`);
             } else {
                 // Detailed cumulative frequency calculation
                 let cumulativeFrequency = 0;
@@ -378,9 +395,7 @@
                 const adjustedL = L - 0.5;
 
                 calculation.result = adjustedL + ((n/2 - cf) / f) * classWidth;
-                calculation.steps.push(`Median Calculation: 
-        L = ${adjustedL}, n = ${n}, cf = ${cf}, f = ${f}, Class Width = ${classWidth}
-        Median = ${adjustedL} + ((${n}/2 - ${cf}) / ${f}) * ${classWidth} = ${calculation.result}`);
+                calculation.steps.push(`Median = ${adjustedL} + ((${n}/2 - ${cf}) / ${f}) * ${classWidth} = ${calculation.result}`);
 
                 return calculation;
             }
@@ -428,10 +443,6 @@
             const classWidth = U - L + 1;
 
             calculation.steps.push(`Modal Class: ${modalClass.x}`);
-            calculation.steps.push(`L = ${adjustedL}`);
-            calculation.steps.push(`D1 (difference with preceding class): ${D1}`);
-            calculation.steps.push(`D2 (difference with succeeding class): ${D2}`);
-            calculation.steps.push(`Class Width: ${classWidth}`);
 
             // Mode calculation formula
             calculation.result = adjustedL + (D1 / (D1 + D2)) * classWidth;
@@ -442,83 +453,313 @@
             return calculation;
         }
 
-        function calculateQuartile(data, totalFrequency, x) {
-            const quartilePosition = x * (totalFrequency + 1) / 4;
-            // Simplified quartile calculation
-            let cumulativeFrequency = 0;
-            for (let row of data) {
-                cumulativeFrequency += row.frequency;
-                if (cumulativeFrequency >= quartilePosition) {
-                    return row.x;
-                }
-            }
-        }
+        function calculateQuartile(data, tableType, x) {
+            let calculation = { steps: [] };
+            const totalFrequency = data.reduce((sum, row) => sum + row.frequency, 0);
+            calculation.steps.push(`Total Frequency: ${totalFrequency}`);
 
-        function calculateDecile(data, totalFrequency, x) {
-                const decilePosition = x * (totalFrequency + 1) / 10;
-                // Simplified decile calculation
+            if (tableType === 'x-frequency') {
+                const quartilePosition = (x * (totalFrequency + 1)) / 4;
+                calculation.steps.push(`Position: ${quartilePosition}:`);
                 let cumulativeFrequency = 0;
                 for (let row of data) {
                     cumulativeFrequency += row.frequency;
-                    if (cumulativeFrequency >= decilePosition) {
-                        return row.x;
+                    calculation.steps.push(`Cumulative Frequency = ${row.x}: ${cumulativeFrequency}`);
+                    if (cumulativeFrequency >= quartilePosition) {
+                        calculation.result = row.x;
+                        calculation.steps.push(`Quartile ${x} is at X = ${row.x}`);
                     }
                 }
+            } else {
+                // Grouped data calculation
+                const quartilePosition = (x/4) * totalFrequency;
+                let cumulativeFrequency = 0;
+                let calculationSteps = [];
+
+                // Calculate cumulative frequencies
+                const cumulativeFrequencyData = data.map((row, index) => {
+                    const [lower, upper] = row.x.split('-').map(Number);
+                    cumulativeFrequency += row.frequency;
+                    const step = {
+                        class: row.x, 
+                        frequency: row.frequency, 
+                        cumulativeFrequency: cumulativeFrequency
+                    };
+                    calculationSteps.push(step);
+                    return { ...row, cumulativeFrequency };
+                });
+
+                calculation.steps.push('Cumulative Frequency Steps:', 
+                    calculationSteps.map(step => 
+                        `Class ${step.class}: Frequency ${step.frequency}, Cumulative Frequency ${step.cumulativeFrequency}`
+                    )
+                );
+
+                const quartileClass = cumulativeFrequencyData.find(row => 
+                    row.cumulativeFrequency >= quartilePosition
+                );
+
+                const [L, U] = quartileClass.x.split('-').map(Number);
+
+                const classWidth = U - L + 1;
+
+                const f = quartileClass.frequency;
+                const cf = calculationSteps.find(step => step.class === quartileClass.x).cumulativeFrequency - quartileClass.frequency;
+
+                const adjustedL = L - 0.5;
+                        
+                calculation.result = adjustedL + ((quartilePosition - cf) / f) * classWidth;
+                calculation.steps.push(`${adjustedL} + ((${quartilePosition} - ${cf}) / ${f}) * ${classWidth} = ${calculation.result}`);
+                
+                return calculation;
             }
 
-        function calculatePercentile(data, totalFrequency, x) {
-            const percentilePosition = x * (totalFrequency + 1) / 100;
-            // Simplified percentile calculation
-            let cumulativeFrequency = 0;
-            for (let row of data) {
-                cumulativeFrequency += row.frequency;
-                if (cumulativeFrequency >= percentilePosition) {
-                    return row.x;
+            return calculation;
+        }
+
+        function calculateDecile(data, tableType, x) {
+            let calculation = { steps: [] };
+            const totalFrequency = data.reduce((sum, row) => sum + row.frequency, 0);
+
+            calculation.steps.push(`Total Frequency: ${totalFrequency}`);
+
+            if (tableType === 'x-frequency') {
+                const decilePosition = (x * (totalFrequency + 1)) / 10;
+                calculation.steps.push(`Position: ${decilePosition}:`);
+                let cumulativeFrequency = 0;
+                for (let row of data) {
+                    cumulativeFrequency += row.frequency;
+                    calculation.steps.push(`Cumulative Frequency for X = ${row.x}: ${cumulativeFrequency}`);
+                    if (cumulativeFrequency >= decilePosition) {
+                        calculation.result = row.x;
+                        calculation.steps.push(`Decile ${x} is at X = ${row.x}`);
+                        break;
+                    }
                 }
+            } else {
+                const decilePosition = (x/10) * totalFrequency;
+
+                // Grouped data calculation
+                let cumulativeFrequency = 0;
+                let calculationSteps = [];
+
+                // Calculate cumulative frequencies
+                const cumulativeFrequencyData = data.map((row, index) => {
+                    const [lower, upper] = row.x.split('-').map(Number);
+                    cumulativeFrequency += row.frequency;
+                    const step = {
+                        class: row.x, 
+                        frequency: row.frequency, 
+                        cumulativeFrequency: cumulativeFrequency
+                    };
+                    calculationSteps.push(step);
+                    return { ...row, cumulativeFrequency };
+                });
+
+                calculation.steps.push('Cumulative Frequency Steps:', 
+                    calculationSteps.map(step => 
+                        `Class ${step.class}: Frequency ${step.frequency}, Cumulative Frequency ${step.cumulativeFrequency}`
+                    )
+                );
+
+                const decileClass = cumulativeFrequencyData.find(row => 
+                    row.cumulativeFrequency >= decilePosition
+                );
+
+                const [L, U] = decileClass.x.split('-').map(Number);
+
+                const classWidth = U - L + 1;
+
+                const f = decileClass.frequency;
+                const cf = calculationSteps.find(step => step.class === decileClass.x).cumulativeFrequency - decileClass.frequency;
+
+                const adjustedL = L - 0.5;
+                        
+                calculation.result = adjustedL + ((decilePosition - cf) / f) * classWidth;
+                calculation.steps.push(`${adjustedL} + ((${decilePosition} - ${cf}) / ${f}) * ${classWidth} = ${calculation.result}`);
+                
+                return calculation;
             }
+
+            return calculation;
+        }
+        
+        function calculatePercentile(data, tableType, x) {
+            let calculation = { steps: [] };
+            const totalFrequency = data.reduce((sum, row) => sum + row.frequency, 0);
+
+            calculation.steps.push(`Total Frequency: ${totalFrequency}`);
+
+            if (tableType === 'x-frequency') {
+                const percentilePosition = x * (totalFrequency + 1) / 100;
+                calculation.steps.push(`Position: ${percentilePosition}:`);
+                let cumulativeFrequency = 0;
+                for (let row of data) {
+                    cumulativeFrequency += row.frequency;
+                    calculation.steps.push(`Cumulative Frequency for X = ${row.x}: ${cumulativeFrequency}`);
+                    if (cumulativeFrequency >= percentilePosition) {
+                        calculation.result = row.x;
+                        calculation.steps.push(`Percentile ${x} is at X = ${row.x}`);
+                        break;
+                    }
+                }
+            } else {
+                const percentilePosition = (x/100) * totalFrequency;
+
+                // Grouped data calculation
+                let cumulativeFrequency = 0;
+                let calculationSteps = [];
+
+                // Calculate cumulative frequencies
+                const cumulativeFrequencyData = data.map((row, index) => {
+                    const [lower, upper] = row.x.split('-').map(Number);
+                    cumulativeFrequency += row.frequency;
+                    const step = {
+                        class: row.x, 
+                        frequency: row.frequency, 
+                        cumulativeFrequency: cumulativeFrequency
+                    };
+                    calculationSteps.push(step);
+                    return { ...row, cumulativeFrequency };
+                });
+
+                calculation.steps.push('Cumulative Frequency Steps:', 
+                    calculationSteps.map(step => 
+                        `Class ${step.class}: Frequency ${step.frequency}, Cumulative Frequency ${step.cumulativeFrequency}`
+                    )
+                );
+
+                const percentileClass = cumulativeFrequencyData.find(row => 
+                    row.cumulativeFrequency >= percentilePosition
+                );
+
+                const [L, U] = percentileClass.x.split('-').map(Number);
+
+                const classWidth = U - L + 1;
+
+                const f = percentileClass.frequency;
+                const cf = calculationSteps.find(step => step.class === percentileClass.x).cumulativeFrequency - percentileClass.frequency;
+
+                const adjustedL = L - 0.5;
+                        
+                calculation.result = adjustedL + ((percentilePosition - cf) / f) * classWidth;
+                calculation.steps.push(`${adjustedL} + ((${percentilePosition} - ${cf}) / ${f}) * ${classWidth} = ${calculation.result}`);
+                
+                return calculation;
+            }
+
+            return calculation;
         }
                 
         function calculateStandardDeviation(data, tableType) {
-            const mean = calculateMean(data, tableType);
+            let calculation = { steps: [] };
+            
+            // Step 1: Calculate Mean (mu)
+            const mean = calculateMeanR(data, tableType);
+            calculation.steps.push(`Mean (μ): ${mean}`);
+
             const totalFrequency = data.reduce((sum, row) => sum + row.frequency, 0);
-            
+            calculation.steps.push(`Total Frequency (n): ${totalFrequency}`);
+
             let sumOfSquaredDeviations = 0;
-            
+
             if (tableType === 'x-frequency') {
                 sumOfSquaredDeviations = data.reduce((sum, row) => {
                     const x = typeof row.x === 'string' ? parseFloat(row.x) : row.x;
-                    return sum + (row.frequency * Math.pow(x - mean, 2));
+                    const squaredDeviation = row.frequency * Math.pow(x - mean, 2);
+                    calculation.steps.push(`X = ${x}, (X - μ)² = ${Math.pow(x - mean, 2)}, Frequency = ${row.frequency}, Squared Deviation = ${squaredDeviation}`);
+                    return sum + squaredDeviation;
                 }, 0);
             } else {
                 sumOfSquaredDeviations = data.reduce((sum, row) => {
                     const [min, max] = row.x.split('-').map(Number);
                     const midpoint = (min + max) / 2;
-                    return sum + (row.frequency * Math.pow(midpoint - mean, 2));
+                    const squaredDeviation = row.frequency * Math.pow(midpoint - mean, 2);
+                    calculation.steps.push(`Class ${row.x}, Midpoint = ${midpoint}, (Midpoint - μ)² = ${Math.pow(midpoint - mean, 2)}, Frequency = ${row.frequency}, Squared Deviation = ${squaredDeviation}`);
+                    return sum + squaredDeviation;
                 }, 0);
             }
-            
-            return Math.sqrt(sumOfSquaredDeviations / totalFrequency);
+
+            const variance = sumOfSquaredDeviations / totalFrequency;
+            const standardDeviation = Math.sqrt(variance);
+
+            calculation.steps.push(`Sum of Squared Deviations: ${sumOfSquaredDeviations}`);
+            calculation.steps.push(`Variance: ${variance}`);
+            calculation.steps.push(`Standard Deviation: ${standardDeviation}`);
+
+            return calculation;
         }
 
         function calculateVariance(data, tableType) {
-            const mean = calculateMean(data, tableType);
+            let calculation = { steps: [] };
+            
+            const mean = calculateMeanR(data, tableType);
+            calculation.steps.push(`Mean (μ): ${mean}`);
+
             const totalFrequency = data.reduce((sum, row) => sum + row.frequency, 0);
-            
+            calculation.steps.push(`Total Frequency (n): ${totalFrequency}`);
+
             let sumOfSquaredDeviations = 0;
-            
+
             if (tableType === 'x-frequency') {
                 sumOfSquaredDeviations = data.reduce((sum, row) => {
                     const x = typeof row.x === 'string' ? parseFloat(row.x) : row.x;
-                    return sum + (row.frequency * Math.pow(x - mean, 2));
+                    const squaredDeviation = row.frequency * Math.pow(x - mean, 2);
+                    calculation.steps.push(`X = ${x}, (X - μ)² = ${Math.pow(x - mean, 2)}, Frequency = ${row.frequency}, Squared Deviation = ${squaredDeviation}`);
+                    return sum + squaredDeviation;
                 }, 0);
             } else {
                 sumOfSquaredDeviations = data.reduce((sum, row) => {
                     const [min, max] = row.x.split('-').map(Number);
                     const midpoint = (min + max) / 2;
-                    return sum + (row.frequency * Math.pow(midpoint - mean, 2));
+                    const squaredDeviation = row.frequency * Math.pow(midpoint - mean, 2);
+                    calculation.steps.push(`Class ${row.x}, Midpoint = ${midpoint}, (Midpoint - μ)² = ${Math.pow(midpoint - mean, 2)}, Frequency = ${row.frequency}, Squared Deviation = ${squaredDeviation}`);
+                    return sum + squaredDeviation;
                 }, 0);
             }
-            return sumOfSquaredDeviations / totalFrequency;
+
+            const variance = sumOfSquaredDeviations / totalFrequency;
+
+            calculation.steps.push(`Sum of Squared Deviations: ${sumOfSquaredDeviations}`);
+            calculation.steps.push(`Variance: ${variance}`);
+
+            return calculation;
+        }
+
+        function calculateMeanDeviation(data, tableType) {
+            let calculation = { steps: [] };
+
+            // Step 1: Calculate Mean
+            const mean = calculateMeanR(data, tableType);
+            calculation.steps.push(`Mean: ${mean}`);
+
+            const totalFrequency = data.reduce((sum, row) => sum + row.frequency, 0);
+            calculation.steps.push(`Total Frequency (n): ${totalFrequency}`);
+
+            let totalDeviation = 0;
+
+            if (tableType === 'x-frequency') {
+                totalDeviation = data.reduce((sum, row) => {
+                    const deviation = Math.abs(row.x - mean) * row.frequency;
+                    calculation.steps.push(`X = ${row.x}, |X - μ| = ${Math.abs(row.x - mean)}, Frequency = ${row.frequency}, Deviation = ${deviation}`);
+                    return sum + deviation;
+                }, 0);
+            } else {
+                totalDeviation = data.reduce((sum, row) => {
+                    const [min, max] = row.x.split('-').map(Number);
+                    const midpoint = (min + max) / 2;
+                    const deviation = Math.abs(midpoint - mean) * row.frequency;
+                    calculation.steps.push(`Class ${row.x}, Midpoint = ${midpoint}, |Midpoint - μ| = ${Math.abs(midpoint - mean)}, Frequency = ${row.frequency}, Deviation = ${deviation}`);
+                    return sum + deviation;
+                }, 0);
+            }
+
+            const meanDeviation = totalDeviation / totalFrequency;
+
+            calculation.steps.push(`Total Deviation: ${totalDeviation}`);
+            calculation.steps.push(`Mean Deviation: ${meanDeviation}`);
+
+            return calculation;
         }
 
         });
